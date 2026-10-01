@@ -6,11 +6,10 @@ from src.altiumpcblibtools.writer import apply_json
 
 
 def main() -> None:
-
     parser = argparse.ArgumentParser(
         description=(
             "Apply semantic footprint JSON "
-            "to an existing Altium PcbLib footprint."
+            "to an Altium PcbLib footprint."
         )
     )
 
@@ -32,8 +31,8 @@ def main() -> None:
     parser.add_argument(
         "-o",
         "--output",
-        help="Output .PcbLib path",
         default=None,
+        help="Output .PcbLib path",
     )
 
     args = parser.parse_args()
