@@ -24,3 +24,6 @@ Thumbs.db
 # Third-party source
 # altium_monkey is an external dependency and must not be committed.
 altium_monkey/
+
+# Generated JSON extraction outputs
+*.json
