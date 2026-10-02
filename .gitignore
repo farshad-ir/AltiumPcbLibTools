@@ -27,3 +27,6 @@ altium_monkey/
 
 # Generated JSON extraction outputs
 *.json
+
+# Altium generated/test libraries
+*.PcbLib
