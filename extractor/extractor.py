@@ -10,6 +10,10 @@ class Extractor:
     def extract(self, source, footprint_name):
         source_footprint = source.find_footprint(footprint_name)
 
+
+        if source_footprint is None:
+            return None
+
         footprint = Footprint(source_footprint.name)
         footprint.parameters = dict(source_footprint.parameters)
 
