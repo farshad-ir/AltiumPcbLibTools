@@ -2,162 +2,610 @@
 
 ## Overview
 
-AltiumPcbLibTools is being developed as a set of tools for programmatic analysis and manipulation of Altium Designer PcbLib footprints.
+**AltiumPcbLibTools** is a semantic toolkit for extracting,
+transforming, and generating Altium Designer PcbLib footprints.
 
-The project is intentionally being developed in stages.
+The project is built around a clear separation of responsibilities:
 
-The first priority is to understand the structure of real PcbLib data and establish a clear semantic representation before implementing footprint generation and modification features.
+* Real Altium PcbLib files are the source of truth.
+* `altium_monkey` handles low-level PcbLib file mechanics.
+* AltiumPcbLibTools operates at the semantic level.
+* JSON provides a readable and programmatically usable representation.
+* Generated PcbLib files are verified in real Altium Designer.
 
-## Development Flow
+The project has been developed incrementally through three working products.
 
-The intended processing flow is:
+---
+
+## Architecture
+
+The current architecture is:
 
 ```text
-Altium PcbLib
-      |
-      v
-  Read / Decode
-      |
-      v
-Footprint Structure
-      |
-      v
- Semantic JSON
-      |
-      v
-   Validate
-      |
-      v
- Modify / Create
-      |
-      v
-Altium PcbLib
-      |
-      v
- Verification in Altium Designer
+                 Real Altium PcbLib
+                         |
+                         v
+                   altium_monkey
+                 Read / Write layer
+                         |
+                         v
+              AltiumPcbLibTools
+                     Extractor
+                         |
+                         v
+               Semantic Footprint
+                         |
+                         v
+                   Semantic JSON
+                         |
+              +----------+----------+
+              |                     |
+              v                     v
+       Analysis /              Transformation
+       Modification                  |
+              |                     |
+              +----------+----------+
+                         |
+                         v
+                   altium_monkey
+                         |
+                         v
+                Generated PcbLib
+                         |
+                         v
+                 Altium Designer
 ```
 
-This represents the intended direction of the project. Not all stages are currently implemented.
+The important architectural decision is that AltiumPcbLibTools does not
+attempt to reimplement the PcbLib binary format.
 
-## PcbLib as the Source
+The low-level file mechanics are delegated to `altium_monkey`.
 
-The source of the initial research is real Altium Designer PcbLib files.
+AltiumPcbLibTools works above that layer with meaningful footprint concepts.
 
-Rather than designing a hypothetical data model first, the project uses real footprints to discover the structures and properties that need to be represented.
+---
 
-This approach helps ensure that the JSON model is based on actual Altium data.
+# Three Current Products
 
-## Footprint Representation
+The project currently has three working products.
 
-A footprint is treated as a collection of semantic objects, or primitives.
+## Product 1 — PcbLib to JSON
 
-Examples include:
+The first product extracts a real Altium footprint and converts it into
+semantic JSON.
+
+```text
+PcbLib
+   |
+   v
+altium_monkey
+   |
+   v
+Extractor
+   |
+   v
+Semantic Footprint
+   |
+   v
+JSON
+```
+
+The extraction process can:
+
+1. Open a real PcbLib.
+2. Locate a footprint.
+3. Extract supported primitives.
+4. Extract footprint parameters.
+5. Build the semantic representation.
+6. Export the result as JSON.
+
+The JSON representation currently includes:
+
+* Footprint parameters
+* Pad Masters
+* Pads
+* Tracks
+* Arcs
+
+A real `CAP_BOSHKE_SMD` footprint has been used during development and
+testing.
+
+---
+
+## Product 2 — JSON to PcbLib: Pads
+
+The second product takes semantic JSON and generates a new PcbLib
+containing pads.
+
+```text
+JSON
+ |
+ v
+Pad Masters
+ |
+ v
+Pad Instances
+ |
+ v
+altium_monkey
+ |
+ v
+PcbLib
+```
+
+The writer can:
+
+* Create the PcbLib container.
+* Create the footprint.
+* Recreate Pad Masters.
+* Create pad instances.
+* Reuse Pad Masters.
+* Preserve pad geometry.
+* Preserve pad position.
+* Preserve pad rotation.
+* Preserve supported hole and plating information.
+
+This product also demonstrated programmatic pad duplication and rotation.
+
+A single Pad Master can be reused by multiple pad instances:
+
+```text
+              Pad Master
+                   |
+        +----------+----------+
+        |          |          |
+      Pad 1      Pad 2      Pad 3
+        |          |          |
+     position   position   position
+     rotation   rotation   rotation
+```
+
+The important capability is therefore not simply rotating a pad, but
+programmatically creating multiple instances from a common semantic
+definition.
+
+The generated PcbLib has been verified in Altium Designer 15.1.
+
+---
+
+## Product 3 — JSON to PcbLib: Pads + Tracks + Arcs
+
+The third product extends the writer to the currently supported full
+graphical footprint representation.
+
+```text
+JSON
+ |
+ +---- Pads
+ |
+ +---- Tracks
+ |
+ +---- Arcs
+ |
+ v
+altium_monkey
+ |
+ v
+PcbLib
+```
+
+The current supported primitives are:
 
 * Pads
 * Tracks
 * Arcs
-* Component bodies
-* Other footprint-level properties
 
-Each primitive may contain geometric, electrical, layer, display, or other properties depending on its type.
+Supported Track information includes:
 
-The JSON representation should preserve the information necessary to understand these objects without requiring the reader to interpret the original binary PcbLib structure.
+* Start point
+* End point
+* Width
+* Layer
 
-## Semantic JSON
+Supported Arc information includes:
 
-The JSON representation is not intended to be a byte-for-byte representation of a PcbLib file.
+* Center
+* Radius
+* Start angle
+* End angle
+* Width
+* Layer
 
-Its purpose is to provide a readable description of the footprint.
+A real `29-04` footprint of a `Q2n2222` containing Pads, Tracks, and an Arc has been
+extracted, transformed, generated again, and successfully opened in
+Altium Designer 15.1.
 
-For example, a track should be represented through meaningful properties such as its layer, endpoints, width, and other applicable attributes rather than as an encoded binary record.
+This is the current definition of the project's **Full supported
+footprint**.
 
-The exact schema will be developed from real PcbLib examples and refined as additional footprint types are analyzed.
+It does not mean that every possible Altium primitive is currently
+supported.
 
-## Validation
+---
 
-Validation is an important part of the architecture.
+# Semantic Footprint Model
 
-A valid semantic representation should contain the properties required by each primitive type and should reject invalid or incomplete data.
+The semantic model is the central abstraction of the project.
 
-Examples of validation may include:
+A footprint is represented through meaningful objects rather than through
+the binary structures of a PcbLib file.
 
-* Required properties are present.
-* Coordinates are valid.
-* Geometric relationships are valid.
-* Layer names or identifiers are recognized.
-* Primitive-specific properties are present.
-* Values have appropriate types and ranges.
+The current model contains:
 
-The validation rules will be developed incrementally as the underlying PcbLib structures become better understood.
+```text
+Footprint
+ |
+ +-- Parameters
+ |
+ +-- Pad Masters
+ |      |
+ |      +-- Pad
+ |      +-- Pad
+ |      +-- Pad
+ |
+ +-- Tracks
+ |
+ +-- Arcs
+```
 
-## PcbLib Generation
+The model can therefore be manipulated without requiring the user to work
+directly with PcbLib binary data.
 
-A later stage of the project will use the semantic representation to create or modify PcbLib footprints.
+---
 
-Generated files must ultimately be tested against real Altium Designer software.
+# Semantic JSON
 
-Successful generation therefore means more than producing a syntactically valid file; the resulting footprint must be correctly interpreted by Altium Designer.
+The JSON representation is a **semantic intermediate representation**.
 
-## Verification
+It is not intended to be a byte-for-byte copy of the original PcbLib.
 
-Verification will be performed at multiple levels.
+For example, a Track is represented by meaningful properties such as:
 
-### Data Level
+```text
+layer
+start
+end
+width
+options
+```
 
-Compare extracted information with the original PcbLib data.
+An Arc is represented by:
 
-### Structural Level
+```text
+layer
+geometry
+options
+```
 
-Verify that the expected primitives and properties are present.
+where the geometry contains information such as:
 
-### File Level
+```text
+center
+radius
+start angle
+end angle
+```
 
-Verify that generated or modified PcbLib files can be opened and processed correctly.
+Pads use the Pad Master / Pad Instance relationship.
 
-### Application Level
+This design makes the JSON:
 
-Open generated PcbLib files in Altium Designer and verify the resulting footprints.
+* readable
+* editable
+* programmatically transformable
+* suitable for testing
+* independent of the original binary encoding
 
-Altium Designer 15.1 is being used as one of the reference environments for testing.
+---
 
-## Third-Party Software
+# Pad Master and Pad Instance
 
-The project may use third-party software and libraries to assist with reading and writing Altium files.
+A Pad Master represents the common definition of a pad.
 
-In particular, `altium_monkey` has been used during the initial PcbLib research and testing.
+It can contain properties such as:
 
-Third-party code remains subject to its own licensing terms and is kept conceptually separate from original AltiumPcbLibTools code.
+* Shape
+* Dimensions
+* Layer
+* Hole information
+* Plating
+* Other pad-specific properties
 
-See the project README for additional information.
+A pad instance contains information specific to its placement:
 
-## Repository Structure
+* Designator
+* Position
+* Rotation
+* Optional overrides
 
-The repository is organized around the following areas:
+Conceptually:
+
+```text
+                Pad Master
+                    |
+        +-----------+-----------+
+        |           |           |
+      Pad 1       Pad 2       Pad 3
+        |           |           |
+     position    position    position
+     rotation    rotation    rotation
+```
+
+This separation allows multiple pads to reuse the same definition while
+having independent positions and rotations.
+
+It is one of the important semantic concepts established by the project.
+
+---
+
+# Division of Responsibility
+
+## `altium_monkey`
+
+`altium_monkey` is responsible for the low-level mechanics required to
+read and write Altium PcbLib files.
+
+This includes the difficult binary/file-format work.
+
+AltiumPcbLibTools deliberately does not duplicate that functionality.
+
+## AltiumPcbLibTools
+
+AltiumPcbLibTools operates at a higher level.
+
+Its responsibilities include:
+
+* Extracting semantic information.
+* Building the semantic footprint model.
+* Serializing the model to JSON.
+* Transforming footprint data.
+* Generating supported footprint primitives.
+* Providing practical tools and workflows.
+* Testing the resulting PcbLib files.
+
+This separation keeps the project focused on **what the footprint means**
+rather than on reimplementing the complete PcbLib binary format.
+
+Third-party code remains subject to its own licensing terms.
+
+---
+
+# Current Supported Primitives
+
+The current Products 1–3 support:
+
+```text
+Pads
+Tracks
+Arcs
+```
+
+The following primitives are future extensions:
+
+```text
+ComponentBody
+Text
+Region
+Fill
+Via
+Other graphical primitives
+3D model data
+```
+
+These are intentionally not current prerequisites.
+
+They should only be investigated and implemented when a real use case
+requires them.
+
+---
+
+# Verification Strategy
+
+Verification takes place at several levels.
+
+## Extraction Verification
+
+Check that information extracted from a real PcbLib corresponds to the
+actual footprint.
+
+## Semantic Verification
+
+Check that the semantic model contains the expected objects and properties.
+
+## Transformation Verification
+
+Check that programmatic changes produce the intended semantic result.
+
+For example, the pad duplication milestone demonstrated that multiple pad
+instances can reuse one Pad Master while having independent positions and
+rotations.
+
+## PcbLib Verification
+
+Check that the generated PcbLib can be opened and processed correctly.
+
+## Altium Verification
+
+Open the generated PcbLib in Altium Designer 15.1 and verify the resulting
+footprint.
+
+Application-level verification is important because producing a file is not
+by itself sufficient.
+
+---
+
+# Repository Structure
+
+The current repository structure is:
 
 ```text
 AltiumPcbLibTools/
+├── .git/
+├── .gitignore
+├── .venv/
+│
 ├── README.md
+├── TODO.md
+│
+├── 29_04.json
+├── CAP_BOSHKE_ROUNDTRIP.PcbLib
+├── P2904.PcbLib
+├── PSMD4.PcbLib
+│
+├── altium_monkey/
+│
+├── builder/
+├── classifier/
+├── exporter/
+├── extractor/
+├── model/
+├── tools/
+├── writer/
+│
 ├── docs/
-├── src/
-└── tests/
+│
+├── examples/
+│
+├── tests/
+│
+└── main.py
 ```
 
-### `docs/`
+The `.venv/` directory is a local development environment and is not part
+of the conceptual application architecture.
 
-Project documentation, technical notes, architecture information, and findings from reverse engineering.
+The sample PcbLib and JSON files at the repository root are development and
+testing artifacts.
 
-### `src/`
+### `altium_monkey/`
 
-Source code belonging to AltiumPcbLibTools.
+Third-party low-level PcbLib implementation used for reading and writing
+Altium files.
+
+### `extractor/`
+
+Code responsible for reading PcbLib data through `altium_monkey` and
+converting it into the project's semantic representation.
+
+### `model/`
+
+Semantic footprint data structures.
+
+### `writer/`
+
+PcbLib generation and transformation logic.
+
+This includes the current Pad-only and Full writers.
+
+### `exporter/`
+
+Export-related functionality, including semantic JSON export.
+
+### `tools/`
+
+Practical command-line and utility tools.
+
+### `builder/`
+
+Footprint-building functionality and supporting development code.
+
+### `classifier/`
+
+Classification and analysis-related functionality.
+
+### `examples/`
+
+Examples and practical usage material.
 
 ### `tests/`
 
-Tests used to verify individual components and complete processing workflows.
+Tests and real-footprint transformation examples.
 
-## Development Principle
+### `docs/`
 
-The project follows a simple principle:
+Architecture documentation, milestones, technical notes, and development
+findings.
 
-> Understand the real data first, then build the abstraction.
+### `main.py`
 
-This means that observations from real PcbLib files should guide the design of the semantic model rather than forcing real files into a prematurely defined structure.
+Project-level entry point used by the current development workflow.
+
+---
+
+# Development Principles
+
+The project follows several principles.
+
+### 1. Understand the real data first
+
+Real Altium PcbLib files guide the design of the semantic model.
+
+### 2. Work at the semantic level
+
+The user should work with concepts such as Pads, Tracks, Arcs, and Pad
+Masters rather than binary records.
+
+### 3. Do not reinvent low-level PcbLib mechanics
+
+`altium_monkey` provides the underlying file-format implementation.
+
+### 4. Verify with real Altium software
+
+A generated file is not considered successful merely because it was written
+without an exception.
+
+It must be accepted and usable by Altium Designer.
+
+### 5. Implement only what is currently needed
+
+Unsupported primitives remain future work until a practical use case
+requires them.
+
+---
+
+# Current Status
+
+The current project status is:
+
+```text
+Product 1
+PcbLib -> JSON
+        WORKING
+
+Product 2
+JSON -> Pads -> PcbLib
+        WORKING
+
+Product 3
+JSON -> Pads + Tracks + Arcs -> PcbLib
+        WORKING
+```
+
+The current architecture therefore provides a complete working round-trip
+for the supported footprint primitives:
+
+```text
+                PcbLib
+                   |
+                   v
+              Extraction
+                   |
+                   v
+             Semantic JSON
+                   |
+                   v
+          Programmatic changes
+                   |
+                   v
+          Pads + Tracks + Arcs
+                   |
+                   v
+             New PcbLib
+                   |
+                   v
+          Altium Designer 15.1
+```
+
+The next development phase is focused on usability: simple commands,
+installation, documentation, examples, and making the three products easy
+to use on another computer.
