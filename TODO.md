@@ -257,6 +257,17 @@ Do not investigate these until they are actually needed for a real use case.
 
 ---
 
+# Suggested Continue
+
+- Add README quick start examples.
+- Compare original and generated pad names.
+- Determine meaning of lost pad suffixes
+  such as:
+  s250h120zc250 -> s250h120
+
+
+---
+
 # Current Status
 
 **Product 1 — PcbLib → JSON: WORKING**

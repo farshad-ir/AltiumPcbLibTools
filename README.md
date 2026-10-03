@@ -1,3 +1,53 @@
+# Quick Start
+
+## Product 1 - Draw JSON
+
+Extract one footprint from a PcbLib file and create a semantic JSON file.
+
+Example:
+
+PYTHONPATH=. .venv/bin/python tools/json_export_cli.py \
+../AltiumTools/Test_Copy.PcbLib \
+CAP_BOSHKE_SMD \
+cap.json
+
+
+## Product 2 - Transform Pads
+
+Create a new PcbLib footprint from JSON using pads only.
+
+Example:
+
+PYTHONPATH=. .venv/bin/python tests/test_pad_roundtrip.py
+
+
+## Product 3 - Transform Full
+
+Create a new PcbLib footprint from JSON using pads, tracks and arcs.
+
+Example:
+
+PYTHONPATH=. .venv/bin/python tests/test_full_roundtrip.py
+
+
+## Current Supported Primitives
+
+Supported:
+
+- Pads
+- Tracks
+- Arcs
+
+Not Yet Supported:
+
+- Text
+- Region
+- ComponentBody
+- 3D Body
+- Fill
+- Via
+
+
 # AltiumPcbLibTools
 
 Tools for reading, analyzing, validating, editing, and creating Altium Designer PcbLib footprints.
